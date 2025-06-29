@@ -93,7 +93,7 @@ class Tank:
             None
         """
         if self.cooldown == 0:
-            bullet_manager.spawn_bullet(
+            bullet_manager.spawn(
                 self.x + self.size // 2,
                 self.y + self.size // 2,
                 self.direction,
@@ -131,4 +131,3 @@ class Tank:
         self.x, self.y = position
         self.direction = 'UP'
         self.cooldown = 0
-    

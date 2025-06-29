@@ -129,6 +129,19 @@ class UI:
         """
         显示暂停菜单。
         """
+
+    def draw_bullets(self, screen, bullets):
+        '''
+        绘制所有子弹对象
+        负责人: wobudao1a
+        Args:
+            screen (pygame.Surface): 绘制目标表面
+            bullets (list): 子弹对象列表
+        '''
+        for bullet in bullets:
+            bullet.draw(screen)
+
+
 if __name__ == "__main__":
     pygame.init()
     ui = UI()

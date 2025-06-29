@@ -1,48 +1,69 @@
 #子弹模块
 class Bullet:
-    def __init__(self, x: int, y: int, direction: int, owner_id: int):
+    def __init__(self, x: int, y: int, direction: str, owner_id: int):
         """
-        初始化子弹位置、方向、发射者ID。
+        初始化子弹属性
+        负责人: wobudao1a​
+        Args:
+            x (int): 初始x坐标
+            y (int): 初始y坐标
+            direction (str): 移动方向（'UP'/'DOWN'/'LEFT'/'RIGHT'）
+            owner_id (int): 发射者ID
         """
+        self.x = x
+        self.y = y
+        self.direction = direction
+        self.speed = 5
+        self.radius = 3
+        self.color = (255, 0, 0)
+        self.alive = True
+        self.owner = owner_id
 
     def update(self, game_map):
         """
-        更新子弹移动和反弹逻辑。
+        更新子弹移动和墙壁碰撞
+        负责人: wobudao1a​
+        Args:
+            game_map (Game_map): 地图对象
         """
+        dirs = {
+            'UP': (0, -1),
+            'DOWN': (0, 1),
+            'LEFT': (-1, 0),
+            'RIGHT': (1, 0)
+        }
+        dx, dy = dirs[self.direction]
+        self.x += dx * self.speed
+        self.y += dy * self.speed
+
+        # 边界检测
+        if not (0 <= self.x < game_map.width*100 and 0 <= self.y < game_map.height*100):
+            self.alive = False
 
     def check_collision(self, tanks: list) -> bool:
         """
-        检查是否击中某个坦克。
-        返回值：是否命中。
+        检测与坦克的碰撞
+        负责人: wobudao1a​
+        Args:
+            tanks (list): 所有坦克对象列表
+        Returns:
+            bool: 是否命中
         """
+        for tank in tanks:
+            if tank.id != self.owner and tank.get_rect().collidepoint(self.x, self.y):
+                self.alive = False
+                return True
+        return False
 
     def draw(self, screen):
         """
-        将子弹绘制到屏幕上。
+        绘制圆形子弹
+        负责人: wobudao1a​
+        Args:
+            screen (pygame.Surface): 绘制目标表面
         """
+        for bullet in self.bullets:
+            bullet.draw(screen)
 
-class BulletManager:
-    def __init__(self):
-        """
-        管理所有子弹的创建与状态更新。
-        """
-
-    def spawn(self, x: int, y: int, direction: int, owner_id: int):
-        """
-        创建新子弹对象加入管理列表。
-        """
-
-    def update(self, game_map, tanks: list):
-        """
-        批量更新所有子弹的状态与碰撞处理。
-        """
-
-    def draw(self, screen):
-        """
-        批量绘制所有子弹。
-        """
-
-    def clear(self):
-        """
-        清空所有子弹（用于游戏重启）。
-        """
+        if self.alive:
+            pygame.draw.circle(screen, self.color, (self.x, self.y), self.radius)
