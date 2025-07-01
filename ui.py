@@ -51,10 +51,20 @@ class UI:
         player_tank.shoot(None)  # 记得替换为真实 bullet_manager
 
 
-    def draw_HUD(self, screen, tanks: list):
-        """
-        绘制得分、状态条等HUD元素。
-        """ 
+   def draw_HUD(self, screen, tanks: list):
+    """
+    绘制得分、状态条等HUD元素。
+    """
+    for i, tank in enumerate(tanks):  # 遍历每个坦克对象
+        # 绘制得分文本
+        score_text = self.font.render(f"Score: {tank['score']}", True, (0, 0, 0))
+        # 将得分文本绘制到屏幕上，位置为(20, 20 + i * 40)，函数score为得分函数
+        screen.blit(score_text, (20, 20 + i * 40))
+
+        # 绘制健康状态文本
+        health_text = self.font.render(f"Health: {tank['health']}", True, (0, 0, 0))
+        # 将健康状态文本绘制到屏幕上，位置为(200, 20 + i * 40)函数health为状态函数
+        screen.blit(health_text, (200, 20 + i * 40))
 
     def draw_map(self, screen, grid):
         """
@@ -115,21 +125,59 @@ class UI:
     end_pos = (center[0] + dir_vec[0], center[1] + dir_vec[1])
     pygame.draw.line(screen, (0, 0, 0), center, end_pos, 3)
 
-    def show_main_menu(self, screen):
-        """
-        显示主菜单界面。
-        """
+# 显示主菜单界面
+def show_main_menu(self, screen):
+    # 填充屏幕背景色为白色
+    screen.fill((255, 255, 255))
+    # 渲染主菜单标题文本，字体为黑色
+    title = self.font.render("Main Menu", True, (0, 0, 0))
+    # 将主菜单标题绘制到屏幕上
+    screen.blit(title, (350, 200))
 
-    def show_game_over(self, screen):
-        """
-        显示游戏结束界面。
-        """
+    # 遍历主菜单选项并绘制到屏幕上
+    for i, item in enumerate(self.main_menu_items):
+        # 根据当前选中项设置文本颜色，选中为灰色，未选中为黑色
+        color = (128, 128, 128) if i == self.selected_item else (0, 0, 0)
+        # 渲染菜单选项文本
+        text = self.font.render(item, True, color)
+        # 将菜单选项文本绘制到屏幕上
+        screen.blit(text, (350, 300 + i * 50))
 
-    def show_pause_menu(self, screen):
-        """
-        显示暂停菜单。
-        """
+# 显示游戏结束界面
+def show_game_over(self, screen):
+    # 填充屏幕背景色为白色
+    screen.fill((255, 255, 255))
+    # 渲染游戏结束标题文本，字体为黑色
+    title = self.font.render("Game Over", True, (0, 0, 0))
+    # 将游戏结束标题绘制到屏幕上
+    screen.blit(title, (350, 200))
 
+    # 遍历游戏结束菜单选项并绘制到屏幕上
+    for i, item in enumerate(self.game_over_items):
+        # 根据当前选中项设置文本颜色，选中为灰色，未选中为黑色
+        color = (128, 128, 128) if i == self.selected_item else (0, 0, 0)
+        # 渲染菜单选项文本
+        text = self.font.render(item, True, color)
+        # 将菜单选项文本绘制到屏幕上
+        screen.blit(text, (350, 300 + i * 50))
+
+# 显示暂停菜单
+def show_pause_menu(self, screen):
+    # 填充屏幕背景色为白色
+    screen.fill((255, 255, 255))
+    # 渲染暂停菜单标题文本，字体为黑色
+    title = self.font.render("Paused", True, (0, 0, 0))
+    # 将暂停菜单标题绘制到屏幕上
+    screen.blit(title, (350, 200))
+
+    # 遍历暂停菜单选项并绘制到屏幕上
+    for i, item in enumerate(self.pause_menu_items):
+        # 根据当前选中项设置文本颜色，选中为灰色，未选中为黑色
+        color = (128, 128, 128) if i == self.selected_item else (0, 0, 0)
+        # 渲染菜单选项文本
+        text = self.font.render(item, True, color)
+        # 将菜单选项文本绘制到屏幕上
+        screen.blit(text, (350, 300 + i * 50))
     def draw_bullets(self, screen, bullets):
         '''
         绘制所有子弹对象
