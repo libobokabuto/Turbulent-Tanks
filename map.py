@@ -1,5 +1,6 @@
 import random
-import pygame
+import config
+import pymunk
 
 class Cell:
     """
@@ -14,23 +15,37 @@ class Cell:
         self.visited = False
 
 class Game_map:
-    def __init__(self, width = None, height = None, extra_walls = None):
+    """
+    地图模块，负责生成和管理迷宫地图。
+    """
+    def __init__(self, debug = False):
         """
         此函数初始化一个 Game_map 对象，可指定大小或随机生成一个横向的矩形迷宫。
         负责人:Thousand
         Args:
-            width (int): 迷宫宽度，默认为 None 时随机生成 4-9。
-            height (int): 迷宫高度，默认为 None 时为 width- 0~2 (最小为4)。
-            extra_walls (int): 拆除的内墙数，默认为 None 时为prim探索后剩余墙数的30%
+            width (int): 迷宫宽度，随机生成 5-8。
+            height (int): 迷宫高度，随机生成 4-5。
+            extra_walls (int): 拆除的内墙数，默认为prim探索后剩余墙数的10%
         """
+        if not debug:
+            self.MAX_WIDTH = config.MAX_MAP_WIDTH
+            self.MIN_WIDTH = config.MIN_MAP_WIDTH
+            self.MAX_HEIGHT = config.MAX_MAP_HEIGHT
+            self.MIN_HEIGHT = config.MIN_MAP_HEIGHT
+            self.INNER_WALLS_PERCENT = config.INNER_WALLS_PERCENT
+        else:
+            self.MAX_WIDTH = 8
+            self.MIN_WIDTH = 8
+            self.MAX_HEIGHT = 4
+            self.MIN_HEIGHT = 4
+            self.INNER_WALLS_PERCENT = 0.1
+
         # 初始化格子矩阵
-        self.width = random.randint(4,9)if width is None else width
-        self.height = self.width - random.randint(0,2)if height is None else height
-        # 不指定参数时，随机生成宽度为4-9，高度为宽度-0~2的矩形迷宫，保证地图为横向
-        if self.height < 4:
-            self.height = 4# 保证高度至少为4
-        self.extra_walls = round(0.3 * (self.width - 1) * (self.height - 1)) if extra_walls is None else extra_walls
-        # 拆除的墙数为prim探索后剩余墙数的30%
+        self.width = random.randint(self.MIN_WIDTH, self.MAX_WIDTH)
+        self.height = random.randint(self.MIN_HEIGHT, self.MAX_HEIGHT)
+        # 随机生成宽度和高度，范围在MIN和MAX之间
+        self.extra_walls = round(self.INNER_WALLS_PERCENT * (self.width - 1) * (self.height - 1))
+        # 拆除的墙数为prim探索后剩余墙数的INNER_WALLS_PERCENT%
         self.grid = [[Cell() for _ in range(self.width)] for _ in range(self.height)]
         # 按行生成，也就是先左右再上下，这里很重要，后续访问格子也是按照第几行第几列的顺序访问
 
@@ -43,6 +58,7 @@ class Game_map:
         """
         # 收集所有仍留存的可拆内墙（去掉边界外的墙）
         candidates = []
+
         for y in range(self.height):
             for x in range(self.width):
                 for dir, (dx, dy) in {
@@ -108,3 +124,25 @@ class Game_map:
             self.random_break_walls(self.extra_walls)
 
         return self.grid
+    
+    def create_static_walls(self, space, ui):
+        static_body = space.static_body
+        ts = ui.TILE_SIZE[self.height]
+        xo = (ui.SCREEN_WIDTH - self.width * ts) // 2
+        yo = config.Y_OFFSET
+
+        for row_idx, row in enumerate(self.grid):
+            for col_idx, cell in enumerate(row):
+                x0 = col_idx * ts + xo
+                y0 = row_idx * ts + yo
+                for dir_key, (p1, p2) in {
+                    'N': ((x0, y0), (x0 + ts, y0)),
+                    'S': ((x0, y0 + ts), (x0 + ts, y0 + ts)),
+                    'W': ((x0, y0), (x0, y0 + ts)),
+                    'E': ((x0 + ts, y0), (x0 + ts, y0 + ts))
+                }.items():
+                    if cell.walls[dir_key]:
+                        seg = pymunk.Segment(static_body, p1, p2, ui.WALL_WIDTH / 2)
+                        seg.elasticity = 0.1
+                        seg.friction = 1.0
+                        space.add(seg)

@@ -1,158 +1,172 @@
 import pygame
+import pymunk
+import config
+import math
 from map import Game_map
 
 class UI:
     """
-    用户界面模块：负责处理输入及图形渲染。
+    渲染模块：图形渲染与音效音乐。
     """
-    def __init__(self, cell_size=100, wall_color=(200, 200, 200), wall_width=2, bg_color=(255, 255, 255)):
+    def __init__(self,debug=False):
         """
-        初始化 UI，设置绘制参数。
+        初始化 UI，读取文件设置绘制参数
         负责人: Thousand
         Args:
-            cell_size (int): 每个格子的像素大小。
-            wall_color (tuple): 墙壁颜色（RGB）。
-            wall_width (int): 墙壁宽度。
-            bg_color (tuple): 背景色。
-        Returns:
-            None
+            debug (bool): 是否为调试模式，默认为 False。
         """
-        self.cell_size = cell_size
-        self.wall_color = wall_color
-        self.wall_width = wall_width
-        self.bg_color = bg_color
-        # 调试时存储碰撞检测点
-        self.debug_points = []
+        if not debug:
+            self.SCREEN_WIDTH = config.SCREEN_WIDTH
+            self.SCREEN_HEIGHT = config.SCREEN_HEIGHT
+            self.TILE_SIZE = config.TILE_SIZE
+            self.FPS = config.FPS
+            self.BG_COLOR = config.BG_COLOR
+            self.WALL_COLOR = config.WALL_COLOR
+            self.WALL_WIDTH = config.WALL_WIDTH
+            self.TILE_COLOR_1 = config.TILE_COLOR_1
+            self.TILE_COLOR_2 = config.TILE_COLOR_2
+            self.Y_OFFSET = config.Y_OFFSET
+        else:
+            self.SCREEN_WIDTH = 1230
+            self.SCREEN_HEIGHT = 915
+            self.TILE_SIZE = {4:150, 5:135}
+            self.FPS = 60
+            self.BG_COLOR = (255, 255, 255)
+            self.WALL_COLOR = (102, 102, 102)
+            self.WALL_WIDTH = 6 
+            self.TILE_COLOR_1 = (214, 214, 214)
+            self.TILE_COLOR_2 = (230, 230, 230)
+            self.Y_OFFSET = 15
 
-    def handle_input(self, player_tank, game_map):
+    def init_pygame(self):
         """
-        处理玩家按键输入，控制坦克的移动与旋转。
-        负责人: libobokabuto
-        Args:
-            player_tank (Tank): 玩家控制的坦克对象。
-            game_map (Game_map): 地图对象。
+        初始化 Pygame，设置屏幕大小和标题。
+        负责人: Thousand
         Returns:
-            dict: 当前帧的操作状态字典。
+            screen (pygame.Surface): Pygame 画布。
+            clock (pygame.time.Clock): Pygame 时钟对象，用于控制帧率。
         """
-        keys = pygame.key.get_pressed()
-        actions = {
-            "UP": keys[pygame.K_w] or keys[pygame.K_UP],
-            "DOWN": keys[pygame.K_s] or keys[pygame.K_DOWN],
-            "LEFT": keys[pygame.K_a] or keys[pygame.K_LEFT],
-            "RIGHT": keys[pygame.K_d] or keys[pygame.K_RIGHT],
-            "SHOOT": keys[pygame.K_SPACE],
-            "SWITCH_MENU": False
-        }
-        # 只负责返回操作状态，真正移动和射击由主循环处理
-        return actions
+        pygame.init()
+        screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
+        pygame.display.set_caption("坦克动荡")
+        clock = pygame.time.Clock()
+        return screen, clock
+    
+    def render(self, screen, game_map, tank):
+        screen.fill(self.BG_COLOR)
+        self.draw_map(screen, game_map)
+        self.draw_tank(screen, tank)
+        self.draw_tank_collision_shapes(screen, tank)
+        pygame.display.flip()
 
-    def draw_map(self, screen, grid):
+    def draw_map(self, screen, game_map: Game_map):
         """
-        绘制迷宫地图并可视化墙体的碰撞盒。
+        渲染地图，遍历 game_map.grid，根据 cell.walls 绘制交替色格子与墙体
+        以screen的左上角为原点，x轴向右，y轴向下。
         负责人: Thousand
         Args:
-            screen (pygame.Surface): 绘制目标画布。
-            grid (list[list[Cell]]): 迷宫格子数据。
-        Returns:
-            None
+            screen (pygame.Surface): Pygame 画布
+            game_map (Game_map): 地图对象
         """
-        screen.fill(self.bg_color)
-        half = self.wall_width // 2
-        for y, row in enumerate(grid):
-            for x, cell in enumerate(row):
-                x0 = x * self.cell_size
-                y0 = y * self.cell_size
+        tile_size = self.TILE_SIZE[game_map.height]# 根据地图高度获取对应的格子大小
+        x_offset = (self.SCREEN_WIDTH - game_map.width * tile_size) // 2
+        y_offset = self.Y_OFFSET# 获取XY偏移量
 
-                # 北墙
+        # 先行后列遍历全部格子
+        for row_idx, row in enumerate(game_map.grid):
+            for col_idx, cell in enumerate(row):
+
+                # 计算格子左上角的像素位置
+                x_px = col_idx * tile_size + x_offset
+                y_px = row_idx * tile_size + y_offset
+
+                # 绘制交替色背景
+                color = self.TILE_COLOR_1 if (row_idx + col_idx) % 2 == 0 else self.TILE_COLOR_2
+                pygame.draw.rect(screen, color, (x_px, y_px, tile_size, tile_size))
+                
+                # 绘制墙体
                 if cell.walls['N']:
-                    pygame.draw.line(screen, self.wall_color,
-                                     (x0, y0), (x0 + self.cell_size, y0),
-                                     self.wall_width)
-                    rect = pygame.Rect(x0, y0 - half,
-                                       self.cell_size, self.wall_width)
-                    pygame.draw.rect(screen, (255, 0, 0), rect, 1)
-                # 南墙
+                    pygame.draw.line(screen, self.WALL_COLOR,
+                                     (x_px, y_px), (x_px + tile_size, y_px), self.WALL_WIDTH)
                 if cell.walls['S']:
-                    py = y0 + self.cell_size
-                    pygame.draw.line(screen, self.wall_color,
-                                     (x0, py), (x0 + self.cell_size, py),
-                                     self.wall_width)
-                    rect = pygame.Rect(x0, py - half,
-                                       self.cell_size, self.wall_width)
-                    pygame.draw.rect(screen, (255, 0, 0), rect, 1)
-                # 西墙
+                    pygame.draw.line(screen, self.WALL_COLOR,
+                                     (x_px, y_px + tile_size), (x_px + tile_size, y_px + tile_size), self.WALL_WIDTH)
                 if cell.walls['W']:
-                    pygame.draw.line(screen, self.wall_color,
-                                     (x0, y0), (x0, y0 + self.cell_size),
-                                     self.wall_width)
-                    rect = pygame.Rect(x0 - half, y0,
-                                       self.wall_width, self.cell_size)
-                    pygame.draw.rect(screen, (255, 0, 0), rect, 1)
-                # 东墙
+                    pygame.draw.line(screen, self.WALL_COLOR,
+                                     (x_px, y_px), (x_px, y_px + tile_size), self.WALL_WIDTH)
                 if cell.walls['E']:
-                    px = x0 + self.cell_size
-                    pygame.draw.line(screen, self.wall_color,
-                                     (px, y0), (px, y0 + self.cell_size),
-                                     self.wall_width)
-                    rect = pygame.Rect(px - half, y0,
-                                       self.wall_width, self.cell_size)
-                    pygame.draw.rect(screen, (255, 0, 0), rect, 1)
-
-        # 可视化碰撞检测点
-        for px, py in getattr(self, 'debug_points', []):
-            pygame.draw.circle(screen, (0, 255, 0), (px, py), 4)
+                    pygame.draw.line(screen, self.WALL_COLOR,
+                                     (x_px + tile_size, y_px), (x_px + tile_size, y_px + tile_size), self.WALL_WIDTH)
 
     def draw_tank(self, screen, tank):
         """
-        绘制单个坦克及其朝向箭头。
+        绘制坦克对象
+        以screen的左上角为原点，x轴向右，y轴向下，角度顺时针增大
         负责人: libobokabuto
         Args:
-            screen (pygame.Surface): 绘图目标画布。
+            screen (pygame.Surface): Pygame 画布。
             tank (Tank): 坦克对象。
-        Returns:
-            None
         """
-        pygame.draw.rect(screen, tank.color, tank.get_rect())
-        center = tank.get_center()
-        arrow_len = 20
-        dir_vec = {
-            'UP': (0, -arrow_len),
-            'DOWN': (0, arrow_len),
-            'LEFT': (-arrow_len, 0),
-            'RIGHT': (arrow_len, 0)
-        }[tank.direction]
-        end_pos = (center[0] + dir_vec[0], center[1] + dir_vec[1])
-        pygame.draw.line(screen, (0, 0, 0), center, end_pos, 3)
 
-    def draw_bullets(self, screen, bullets):
+        # 计算坦克中心点，坐标
+        cx, cy = tank.get_center()
+
+        # 计算坦克的各个部分尺寸
+        length     = int(tank.length)     # 车身高度
+        width      = int(tank.width)     # 车身宽度
+        barrel_len = int(length / 1.5)      # 炮管长度
+        barrel_w   = max(2, int(width / 4))  # 炮管宽度
+        turret_r   = max(2, int(width / 2.5)) # 炮塔半径
+
+        # 创建surface
+        surf_w = width
+        surf_h = barrel_len + length
+        surf  = pygame.Surface((surf_w, surf_h), pygame.SRCALPHA)
+
+        # 计算surface中心点
+        cx_surf = surf_w // 2
+        cy_surf = surf_h // 2
+
+        # 对齐车身矩形的中心点对齐到 surf 的中心
+        body_rect = pygame.Rect(
+            0,
+            cy_surf - length // 2,
+            width,
+            length
+        )
+        pygame.draw.rect(surf, tank.color, body_rect)
+        pygame.draw.rect(surf, (0,0,0), body_rect, 2)
+
+        # 将炮管从车身中心往上延伸 barrel_len
+        barrel_rect = pygame.Rect(
+            cx_surf - barrel_w // 2,
+            cy_surf - barrel_len,
+            barrel_w,
+            barrel_len
+        )
+        pygame.draw.rect(surf, tank.weapon_color, barrel_rect)
+        pygame.draw.rect(surf, (0,0,0), barrel_rect, 2)
+
+        # 以车身中心为圆心绘制炮塔
+        pygame.draw.circle(surf, tank.weapon_color, (cx_surf, cy_surf), turret_r)
+        pygame.draw.circle(surf, (0,0,0),          (cx_surf, cy_surf), turret_r, 2)
+
+        # 旋转并贴到屏幕上
+        angle = math.degrees(tank.body.angle) % 360
+        rotated = pygame.transform.rotate(surf, -angle)
+        rot_rect = rotated.get_rect(center=(cx, cy))
+        screen.blit(rotated, rot_rect)
+
+    def draw_tank_collision_shapes(self, screen, tank):
         """
-        绘制所有子弹对象。
-        负责人: wobudao1a
+        绘制坦克的碰撞箱，主要用于调试。
+        负责人: thousand
         Args:
-            screen (pygame.Surface): 绘图目标画布。
-            bullets (list): 子弹对象列表。
-        Returns:
-            None
+            screen (pygame.Surface): Pygame 画布。
+            tank (Tank): 坦克对象。
         """
-        for bullet in bullets:
-            bullet.draw(screen)
-
-if __name__ == "__main__":
-    pygame.init()
-    ui = UI()
-    game_map = map.Game_map()
-    grid = game_map.generate_map()
-    screen = pygame.display.set_mode((game_map.width * ui.cell_size, game_map.height * ui.cell_size))
-    pygame.display.set_caption("Maze UI Test")
-    clock = pygame.time.Clock()
-    running = True
-
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-        # 示例：把 debug_points 从 Tank 自动传递给 UI
-        ui.debug_points = getattr(ui, 'debug_points', [])
-        ui.draw_map(screen, grid)
-        pygame.display.flip()
-        clock.tick(30)
+        for shape in [tank.shape, tank.barrel_shape]:
+            if isinstance(shape, pymunk.Poly):
+                vs = [tank.body.local_to_world(v) for v in shape.get_vertices()]
+                pts = [(int(v[0]), int(v[1])) for v in vs]
+                pygame.draw.polygon(screen, (255, 0, 0), pts, 2)
