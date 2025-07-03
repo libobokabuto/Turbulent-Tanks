@@ -1,6 +1,7 @@
 import random
 import config
 import pymunk
+import math
 
 class Cell:
     """
@@ -28,17 +29,23 @@ class Game_map:
             extra_walls (int): 拆除的内墙数，默认为prim探索后剩余墙数的10%
         """
         if not debug:
-            self.MAX_WIDTH = config.MAX_MAP_WIDTH
-            self.MIN_WIDTH = config.MIN_MAP_WIDTH
-            self.MAX_HEIGHT = config.MAX_MAP_HEIGHT
-            self.MIN_HEIGHT = config.MIN_MAP_HEIGHT
+            self.MAX_WIDTH           = config.MAX_MAP_WIDTH
+            self.MIN_WIDTH           = config.MIN_MAP_WIDTH
+            self.MAX_HEIGHT          = config.MAX_MAP_HEIGHT
+            self.MIN_HEIGHT          = config.MIN_MAP_HEIGHT
             self.INNER_WALLS_PERCENT = config.INNER_WALLS_PERCENT
+            self.y_offset            = config.Y_OFFSET
+            self.wall_elasticity     = config.WALL_ELASTICITY
+            self.friction            = config.WALL_FRICTION
         else:
-            self.MAX_WIDTH = 8
-            self.MIN_WIDTH = 8
-            self.MAX_HEIGHT = 4
-            self.MIN_HEIGHT = 4
+            self.MAX_WIDTH           = 8
+            self.MIN_WIDTH           = 5
+            self.MAX_HEIGHT          = 5
+            self.MIN_HEIGHT          = 5
             self.INNER_WALLS_PERCENT = 0.1
+            self.y_offset            = 15
+            self.wall_elasticity     = 1.0
+            self.wall_friction       = 0.0
 
         # 初始化格子矩阵
         self.width = random.randint(self.MIN_WIDTH, self.MAX_WIDTH)
@@ -129,7 +136,7 @@ class Game_map:
         static_body = space.static_body
         ts = ui.TILE_SIZE[self.height]
         xo = (ui.SCREEN_WIDTH - self.width * ts) // 2
-        yo = config.Y_OFFSET
+        yo = self.y_offset
 
         for row_idx, row in enumerate(self.grid):
             for col_idx, cell in enumerate(row):
@@ -143,6 +150,44 @@ class Game_map:
                 }.items():
                     if cell.walls[dir_key]:
                         seg = pymunk.Segment(static_body, p1, p2, ui.WALL_WIDTH / 2)
-                        seg.elasticity = 0.1
-                        seg.friction = 1.0
+                        seg.elasticity = self.wall_elasticity
+                        seg.friction = self.wall_friction
                         space.add(seg)
+
+    def get_spawn_points(self, num_players: int, ui) -> list[tuple[float, float]]:
+        """
+        计算 num_players 个互相距离尽可能远的出生点。（像素坐标）
+        Args:
+            num_players (int): 玩家 / 坦克数量
+            ui (UI): 用来拿 TILE_SIZE 与屏幕偏移量
+        Returns:
+            List[(x, y)]
+        """
+        ts = ui.TILE_SIZE[self.height]
+        x_off = (ui.SCREEN_WIDTH - self.width * ts) // 2
+        y_off = ui.Y_OFFSET
+
+        # ① 把所有格子中心收集成候选点
+        candidates = [
+            (col * ts + x_off + ts / 2,
+             row * ts + y_off + ts / 2)
+            for row in range(self.height)
+            for col in range(self.width)
+        ]
+
+        # ② 选择首个随机点
+        spawn_pts = [random.choice(candidates)]
+        candidates.remove(spawn_pts[0])
+
+        # ③ 依次挑“离已有点最远”的格子
+        while len(spawn_pts) < num_players and candidates:
+            # 对每个候选点，算它到已选点的最小距离
+            dist_to_nearest = [
+                min(math.hypot(cx - sx, cy - sy) for sx, sy in spawn_pts)
+                for cx, cy in candidates
+            ]
+            # 取该最小距离最大的那个点
+            idx = dist_to_nearest.index(max(dist_to_nearest))
+            spawn_pts.append(candidates.pop(idx))
+
+        return spawn_pts

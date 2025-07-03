@@ -16,27 +16,31 @@ class UI:
             debug (bool): 是否为调试模式，默认为 False。
         """
         if not debug:
-            self.SCREEN_WIDTH = config.SCREEN_WIDTH
-            self.SCREEN_HEIGHT = config.SCREEN_HEIGHT
-            self.TILE_SIZE = config.TILE_SIZE
-            self.FPS = config.FPS
-            self.BG_COLOR = config.BG_COLOR
-            self.WALL_COLOR = config.WALL_COLOR
-            self.WALL_WIDTH = config.WALL_WIDTH
-            self.TILE_COLOR_1 = config.TILE_COLOR_1
-            self.TILE_COLOR_2 = config.TILE_COLOR_2
-            self.Y_OFFSET = config.Y_OFFSET
+            self.SCREEN_WIDTH          = config.SCREEN_WIDTH
+            self.SCREEN_HEIGHT         = config.SCREEN_HEIGHT
+            self.TILE_SIZE             = config.TILE_SIZE
+            self.FPS                   = config.FPS
+            self.BG_COLOR              = config.BG_COLOR
+            self.WALL_COLOR            = config.WALL_COLOR
+            self.WALL_WIDTH            = config.WALL_WIDTH
+            self.TILE_COLOR_1          = config.TILE_COLOR_1
+            self.TILE_COLOR_2          = config.TILE_COLOR_2
+            self.Y_OFFSET              = config.Y_OFFSET
+            self.outline_color         = config.OUTLINE_COLOR
+            self.debug_collision_color = config.DEBUG_COLLISION_COLOR
         else:
-            self.SCREEN_WIDTH = 1230
-            self.SCREEN_HEIGHT = 915
-            self.TILE_SIZE = {4:150, 5:135}
-            self.FPS = 60
-            self.BG_COLOR = (255, 255, 255)
-            self.WALL_COLOR = (102, 102, 102)
-            self.WALL_WIDTH = 6 
-            self.TILE_COLOR_1 = (214, 214, 214)
-            self.TILE_COLOR_2 = (230, 230, 230)
-            self.Y_OFFSET = 15
+            self.SCREEN_WIDTH          = 1230
+            self.SCREEN_HEIGHT         = 915
+            self.TILE_SIZE             = {4:150, 5:135}
+            self.FPS                   = 60
+            self.BG_COLOR              = (255, 255, 255)
+            self.WALL_COLOR            = (102, 102, 102)
+            self.WALL_WIDTH            = 8 
+            self.TILE_COLOR_1          = (214, 214, 214)
+            self.TILE_COLOR_2          = (230, 230, 230)
+            self.Y_OFFSET              = 15
+            self.outline_color         = (0,0,0)
+            self.debug_collision_color = (255, 0, 0)
 
     def init_pygame(self):
         """
@@ -51,13 +55,6 @@ class UI:
         pygame.display.set_caption("坦克动荡")
         clock = pygame.time.Clock()
         return screen, clock
-    
-    def render(self, screen, game_map, tank):
-        screen.fill(self.BG_COLOR)
-        self.draw_map(screen, game_map)
-        self.draw_tank(screen, tank)
-        self.draw_tank_collision_shapes(screen, tank)
-        pygame.display.flip()
 
     def draw_map(self, screen, game_map: Game_map):
         """
@@ -135,7 +132,7 @@ class UI:
             length
         )
         pygame.draw.rect(surf, tank.color, body_rect)
-        pygame.draw.rect(surf, (0,0,0), body_rect, 2)
+        pygame.draw.rect(surf, self.outline_color, body_rect, 2)
 
         # 将炮管从车身中心往上延伸 barrel_len
         barrel_rect = pygame.Rect(
@@ -145,17 +142,30 @@ class UI:
             barrel_len
         )
         pygame.draw.rect(surf, tank.weapon_color, barrel_rect)
-        pygame.draw.rect(surf, (0,0,0), barrel_rect, 2)
+        pygame.draw.rect(surf, self.outline_color, barrel_rect, 2)
 
         # 以车身中心为圆心绘制炮塔
         pygame.draw.circle(surf, tank.weapon_color, (cx_surf, cy_surf), turret_r)
-        pygame.draw.circle(surf, (0,0,0),          (cx_surf, cy_surf), turret_r, 2)
+        pygame.draw.circle(surf, self.outline_color,(cx_surf, cy_surf), turret_r, 2)
 
         # 旋转并贴到屏幕上
         angle = math.degrees(tank.body.angle) % 360
         rotated = pygame.transform.rotate(surf, -angle)
         rot_rect = rotated.get_rect(center=(cx, cy))
         screen.blit(rotated, rot_rect)
+
+    def draw_bullets(self,screen:pygame.Surface, bullets: list):
+        """
+        批量渲染子弹列表。
+        负责人: Thousand
+        """
+        for b in bullets:
+            if not b.alive:
+                continue
+            x, y= b.get_position()
+            r = b.radius
+            color = b.color
+            pygame.draw.circle(screen, color, (x, y), r)
 
     def draw_tank_collision_shapes(self, screen, tank):
         """
@@ -169,4 +179,4 @@ class UI:
             if isinstance(shape, pymunk.Poly):
                 vs = [tank.body.local_to_world(v) for v in shape.get_vertices()]
                 pts = [(int(v[0]), int(v[1])) for v in vs]
-                pygame.draw.polygon(screen, (255, 0, 0), pts, 2)
+                pygame.draw.polygon(screen, self.debug_collision_color, pts, 2)

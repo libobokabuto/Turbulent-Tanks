@@ -2,6 +2,7 @@ import pygame
 import config
 import pymunk
 import math
+import time
 from map import Game_map
 
 class Tank:
@@ -38,48 +39,53 @@ class Tank:
         self.is_ai = is_ai
 
         if not debug:
-            self.length = config.TANK_LENGTH * self.scale
-            self.width = config.TANK_WIDTH * self.scale
-            self.max_speed = config.TANK_MAX_SPEED * self.scale
-            self.direction = config.TANK_DIRECTION
-            self.cooldown = config.TANK_COOLDOWN
-            self.max_exist_ammo = config.TANK_MAX_EXIST_AMMO
-            self.rotate_step = config.TANK_ROTATE_STEP
-            self.weapon_color = config.TANK_WEAPON_COLOR
-            self.mass = config.TANK_MASS
-            self.angular_damping = config.TANK_ANGULAR_DAMPING
-            self.elasticity = config.TANK_ELASTICITY
-            self.friction = config.TANK_FRICTION
-            self.collision_type = config.TANK_COLLISION_TYPE
+            self.length          = config.TANK_LENGTH * self.scale
+            self.width           = config.TANK_WIDTH * self.scale
+            self.max_speed       = config.TANK_MAX_SPEED * self.scale
+            self.cooldown        = config.TANK_COOLDOWN
+            self.max_exist_ammo  = config.TANK_MAX_EXIST_AMMO
+            self.rotate_step     = config.TANK_ROTATE_STEP
+            self.weapon_color    = config.TANK_WEAPON_COLOR
+            self.mass            = config.TANK_MASS
+            self.elasticity      = config.TANK_ELASTICITY
+            self.friction        = config.TANK_FRICTION
+            self.collision_type  = config.TANK_COLLISION_TYPE
+            self.last_fire       = config.TANK_LAST_FIRE
+            self.force           = config.TANK_FORCE
+            self.angular_dumping = config.TANK_ANGULAR_DAMPING
+
         else:
-            self.length = 65 * self.scale
-            self.width = 45 * self.scale
-            self.max_speed = 144 * self.scale
-            self.direction = 0
-            self.cooldown = 0
-            self.max_exist_ammo = 5
-            self.rotate_step = 2
-            self.weapon_color = (100, 100, 100)
-            self.mass = 1
-            #self.angular_damping = 0.05
-            self.elasticity = 0.3
-            self.friction = 0.5
-            self.collision_type = 1
+            self.length          = 65 * self.scale
+            self.width           = 45 * self.scale
+            self.max_speed       = 144 * self.scale
+            self.cooldown        = 0.5
+            self.max_exist_ammo  = 5
+            self.rotate_step     = 2
+            self.weapon_color    = (100, 100, 100)
+            self.mass            = 1
+            self.elasticity      = 0.3
+            self.friction        = 0.5
+            self.collision_type  = 1
+            self.last_fire       = 0.0
+            self.force           = 500
+            self.angular_dumping = 0.8
 
         # 创建物理 Body
         moment = pymunk.moment_for_box(self.mass, (self.width, self.length))
         self.body = pymunk.Body(self.mass, moment, body_type=pymunk.Body.DYNAMIC)
         self.body.position = x, y
-        #self.body.angular_damping = self.angular_damping
 
         # 创建车身 Shape
         self.shape = pymunk.Poly.create_box(self.body, (self.width, self.length))
-        self.shape.elasticity = config.TANK_ELASTICITY
-        self.shape.friction = config.TANK_FRICTION
-        self.shape.collision_type = config.TANK_COLLISION_TYPE
+        self.shape.elasticity = self.elasticity
+        self.shape.friction   = self.friction
+        self.shape.collision_type = self.collision_type
+
+        # ① 让车身加入与子弹一致的 group
+        self.shape.filter = pymunk.ShapeFilter(group=self.id)  # ★新增
         space.add(self.body, self.shape)
 
-        # 创建炮塔 Shape
+        # 创建炮管 Shape
         barrel_len = self.length / 1.5
         barrel_w   = max(2, self.width / 4)
         cx, cy = 0, -barrel_len/2
@@ -91,13 +97,19 @@ class Tank:
             (cx - w2, cy + l2),  # 左下
         ]
         barrel_shape = pymunk.Poly(self.body, barrel_vertices)
-        barrel_shape.elasticity = config.TANK_ELASTICITY
-        barrel_shape.friction   = config.TANK_FRICTION
-        barrel_shape.collision_type = config.TANK_COLLISION_TYPE
-        # 使用坦克自身 ID 分组，防止自身碰撞
-        barrel_shape.filter = pymunk.ShapeFilter(group=self.body.id)
+        barrel_shape.elasticity = self.elasticity
+        barrel_shape.friction   = self.friction
+        barrel_shape.collision_type = self.collision_type
+
+        # ② 炮管同样使用同一 group（改掉 self.body.id）
+        barrel_shape.filter = pymunk.ShapeFilter(group=self.id)  # ★修改
         space.add(barrel_shape)
         self.barrel_shape = barrel_shape
+
+        self.dead = False
+        self.body.tank = self
+        self.shape.tank = self
+        self.barrel_shape.tank = self
 
     def apply_actions(self,actions):
         # 旋转
@@ -108,7 +120,7 @@ class Tank:
         # 推进/制动
         if actions["UP"] or actions["DOWN"]:
             ang = self.body.angle
-            force = 500 * (1 if actions["UP"] else -1)
+            force = self.force * (1 if actions["UP"] else -1)
             fx = force * math.sin(ang)
             fy = -force * math.cos(ang)
             self.body.apply_force_at_world_point((fx, fy), self.body.position)
@@ -117,9 +129,28 @@ class Tank:
     
     def limit_speed(self):
         v = self.body.velocity
-        if v.length > config.TANK_MAX_SPEED:
-            self.body.velocity = v.normalized() * config.TANK_MAX_SPEED
-        self.body.angular_velocity *= 0.8
+        if v.length > self.max_speed:
+            self.body.velocity = v.normalized() * self.max_speed
+        self.body.angular_velocity *= self.angular_dumping
+
+    # tank.py
+    def can_fire(self) -> bool:
+        """冷却结束且坦克存活才能开火。"""
+        return (not self.dead) and (time.time() - self.last_fire >= self.cooldown)
+
+    def mark_fired(self):
+        self.last_fire = time.time()
+
+    def get_barrel_tip(self) -> tuple[float, float, float]:
+        """
+        计算并返回炮管末端 (x, y) 及坦克朝向角度（弧度）。
+        """
+        angle = self.body.angle
+        cx, cy = self.body.position
+        barrel_len = self.length / 1.5
+        tip_x = cx + barrel_len * math.sin(angle)
+        tip_y = cy - barrel_len * math.cos(angle)
+        return tip_x, tip_y, angle
 
     def get_rect(self) -> pygame.Rect:
         """
