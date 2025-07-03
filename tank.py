@@ -112,6 +112,14 @@ class Tank:
         self.barrel_shape.tank = self
 
     def apply_actions(self,actions):
+        """
+        应用坦克转向及移动操作
+        以左上角为原点
+        负责人: libobokabuto
+
+        Args:
+            actions (dict): 操作指令字典，包含 LEFT, RIGHT, UP, DOWN 键状态
+        """
         # 旋转
         if actions["LEFT"]:
             self.body.angle -= math.radians(self.rotate_step)
@@ -128,6 +136,11 @@ class Tank:
             self.body.velocity = (0, 0)
     
     def limit_speed(self):
+        """
+        限制坦克的最大速度并应用角速度衰减
+        以左上角为原点
+        负责人: libobokabuto
+        """
         v = self.body.velocity
         if v.length > self.max_speed:
             self.body.velocity = v.normalized() * self.max_speed
@@ -135,15 +148,33 @@ class Tank:
 
     # tank.py
     def can_fire(self) -> bool:
+        """
+        检查坦克是否可以开火
+        以左上角为原点
+        负责人: libobokabuto
+
+        Returns:
+            bool: 如果冷却结束且坦克存活，则返回 True，否则返回 False
+        """
         """冷却结束且坦克存活才能开火。"""
         return (not self.dead) and (time.time() - self.last_fire >= self.cooldown)
 
     def mark_fired(self):
+        """
+        标记坦克开火时间
+        以左上角为原点
+        负责人: libobokabuto
+        """
         self.last_fire = time.time()
 
     def get_barrel_tip(self) -> tuple[float, float, float]:
         """
-        计算并返回炮管末端 (x, y) 及坦克朝向角度（弧度）。
+        获取炮管末端坐标及坦克当前朝向角度
+        以左上角为原点
+        负责人: libobokabuto
+
+        Returns:
+            tuple: 炮管末端的 (x, y) 坐标和朝向角度 (弧度)
         """
         angle = self.body.angle
         cx, cy = self.body.position

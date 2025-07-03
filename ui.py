@@ -11,7 +11,7 @@ class UI:
     def __init__(self,debug=False):
         """
         初始化 UI，读取文件设置绘制参数
-        负责人: Thousand
+        负责人: Thousand，guyimo12
         Args:
             debug (bool): 是否为调试模式，默认为 False。
         """
@@ -42,10 +42,22 @@ class UI:
             self.outline_color         = (0,0,0)
             self.debug_collision_color = (255, 0, 0)
 
+        # 初始化 Pygame 字体模块
+        pygame.font.init()
+        # 准备多种字号
+        
+        self.font_large  = pygame.font.SysFont("Microsoft YaHei", 72)
+        self.font_medium = pygame.font.SysFont("Microsoft YaHei", 36)
+        self.font_small  = pygame.font.SysFont("Microsoft YaHei", 24)
+
+        # 菜单选项状态
+        self.menu_options    = ["开始游戏", "设置", "退出"]
+        self.selected_option = 0
+        
     def init_pygame(self):
         """
         初始化 Pygame，设置屏幕大小和标题。
-        负责人: Thousand
+        负责人: Thousand，guyimou12
         Returns:
             screen (pygame.Surface): Pygame 画布。
             clock (pygame.time.Clock): Pygame 时钟对象，用于控制帧率。
@@ -55,6 +67,69 @@ class UI:
         pygame.display.set_caption("坦克动荡")
         clock = pygame.time.Clock()
         return screen, clock
+
+    def draw_main_menu(self, screen):
+        """
+        绘制主菜单界面，包括标题与选项高亮
+        负责人: libobokabuto，guyimou12
+        Args:
+            screen (pygame.Surface): Pygame 画布。
+        """
+        screen.fill(self.BG_COLOR)
+        # 标题
+        title_surf = self.font_large.render("动荡坦克", True, self.outline_color)
+        title_rect = title_surf.get_rect(center=(self.SCREEN_WIDTH//2, self.SCREEN_HEIGHT//4))
+        screen.blit(title_surf, title_rect)
+        # 菜单选项
+        for idx, option in enumerate(self.menu_options):
+            color = self.outline_color if idx == self.selected_option else self.WALL_COLOR
+            opt_surf = self.font_medium.render(option, True, color)
+            opt_rect = opt_surf.get_rect(center=(self.SCREEN_WIDTH//2, self.SCREEN_HEIGHT//2 + idx * 50))
+            screen.blit(opt_surf, opt_rect)
+
+    def draw_scoreboard(self, screen, scores: dict, game_map):
+        """
+        绘制记分板，显示每个玩家获胜次数
+        负责人: libobokabuto，guyimou12
+        Args:
+            screen (pygame.Surface): Pygame 画布。
+            scores (dict): 玩家ID->胜利次数映射。
+            game_map (Game_map): 地图对象，用于计算地图像素高度。
+        """
+        # 计算地图在屏幕上的像素高度与左侧偏移
+        tile_size    = self.TILE_SIZE[game_map.height]
+        map_px_h     = game_map.height * tile_size
+        x_offset     = (self.SCREEN_WIDTH - game_map.width * tile_size) // 2
+
+        # 让记分板顶端对齐到“地图底部 + 10 像素”
+        start_y = self.Y_OFFSET + map_px_h + 10
+        for player_id, wins in scores.items():
+            text = f"玩家 {player_id} 胜利次数: {wins}"
+            surf = self.font_small.render(text, True, self.outline_color)
+            screen.blit(surf, (x_offset, start_y))
+            start_y += 30
+
+    def draw_settings(self, screen, settings: dict, selected: int = 0):
+        """
+        绘制设置界面，列出所有可调节项并高亮当前选择
+        负责人: libobokabuto，guyimou12
+        Args:
+            screen (pygame.Surface): Pygame 画布。
+            settings (dict): 设置项->当前值映射。
+            selected (int): 高亮设置项索引，默认 0。
+        """
+        screen.fill(self.BG_COLOR)
+        # 标题
+        title_surf = self.font_large.render("设置", True, self.outline_color)
+        title_rect = title_surf.get_rect(center=(self.SCREEN_WIDTH//2, self.SCREEN_HEIGHT//6))
+        screen.blit(title_surf, title_rect)
+        # 列表
+        for idx, (key, val) in enumerate(settings.items()):
+            text = f"{key}: {val}"
+            color = self.outline_color if idx == selected else self.WALL_COLOR
+            surf = self.font_medium.render(text, True, color)
+            rect = surf.get_rect(center=(self.SCREEN_WIDTH//2, self.SCREEN_HEIGHT//3 + idx * 50))
+            screen.blit(surf, rect)
 
     def draw_map(self, screen, game_map: Game_map):
         """
