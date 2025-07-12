@@ -43,7 +43,7 @@ def init_game(debug: bool = True):
     return ui, screen, clock, space, game_map, hci, tanks, bullets
 
 
-def handle_tank_actions(tanks, actions, bullets, space):
+def handle_tank_actions(tanks, actions, bullets, space, ui: UI):
     """
     应用玩家输入到每辆坦克，管理开火与冷却
     负责人: libobokabuto
@@ -68,6 +68,7 @@ def handle_tank_actions(tanks, actions, bullets, space):
             1 for b in bullets if b.owner_id == tank.id and b.alive
         )
         if act["SHOOT"] and own_bullets < tank.max_exist_ammo and tank.can_fire():
+            ui.play_sound('tank_fire')
             tip_x, tip_y, ang = tank.get_barrel_tip()
             bullets.append(
                 Bullet(space, tip_x, tip_y, ang, tank.id, tank.scale, debug=True)
@@ -107,15 +108,18 @@ def main():
     ui, screen, clock, space, game_map, hci, tanks, bullets = init_game(debug=True)
     scores = {t.id: 0 for t in tanks}
     # 2) 初始化记分板并注册碰撞回调
-    register_collision_handlers(space, scores)
+    register_collision_handlers(space, scores,ui)
     # 3) 设置界面数据
     settings = {"音量": 5, "难度": "普通"}
     selected_setting = 0
     state = 'menu'
+    current_music = None
 
     # 仅存一人时倒计时开始时间（毫秒）
     countdown_start = None
-    
+
+    ui.play_bg_music('menu')
+    current_music = 'menu'
 
     running = True
     while running:
@@ -128,19 +132,28 @@ def main():
             # 游戏中按 ESC/Tab 返回主菜单
             elif state == 'game' and event.type == KEYDOWN and event.key in (K_ESCAPE, K_TAB):
                 state = 'menu'
+                if current_music != 'menu':
+                    ui.play_bg_music('menu')
+                    current_music = 'menu'
                 break
 
             # 菜单状态下的上下左右和回车
             elif state == 'menu' and event.type == KEYDOWN:
                 if event.key == K_UP:
+                    ui.play_sound('menu_select')
                     ui.selected_option = (ui.selected_option - 1) % len(ui.menu_options)
                 elif event.key == K_DOWN:
+                    ui.play_sound('menu_select')
                     ui.selected_option = (ui.selected_option + 1) % len(ui.menu_options)
                 elif event.key == K_RETURN:
+                    ui.play_sound('menu_confirm')
                     choice = ui.menu_options[ui.selected_option]
                     idx = ui.selected_option
                     if idx == 0:       # 开始游戏
                         state = 'game'
+                        if current_music != 'game':
+                            ui.play_bg_music('game')
+                            current_music = 'game'
                     elif idx == 1:     # 设置
                         state = 'settings'
                     elif idx == 2:     # 退出
@@ -149,17 +162,30 @@ def main():
              # 设置界面下的交互       
             elif state == 'settings' and event.type == KEYDOWN:
                 if event.key == K_ESCAPE:
+                    ui.play_sound('menu_select')
                     state = 'menu'
                 elif event.key == K_UP:
+                    ui.play_sound('menu_select')
                     selected_setting = (selected_setting - 1) % len(settings)
                 elif event.key == K_DOWN:
+                    ui.play_sound('menu_select')
                     selected_setting = (selected_setting + 1) % len(settings)
                 elif event.key == K_LEFT and isinstance(list(settings.values())[selected_setting], int):
+                    ui.play_sound('menu_select')
                     key = list(settings.keys())[selected_setting]
                     settings[key] = max(0, settings[key] - 1)
+                    if key == "音量":
+                        volume = settings[key] / 10.0
+                        ui.set_sound_volume(volume)
+                        ui.set_music_volume(volume)
                 elif event.key == K_RIGHT and isinstance(list(settings.values())[selected_setting], int):
+                    ui.play_sound('menu_select')
                     key = list(settings.keys())[selected_setting]
                     settings[key] += 1
+                    if key == "音量":
+                        volume = min(settings[key] / 10.0, 1.0)
+                        ui.set_sound_volume(volume)
+                        ui.set_music_volume(volume)
                 elif event.key == K_RETURN:
                     # 暂无额外操作，按 ENTER 返回菜单
                     state = 'menu'
@@ -176,6 +202,9 @@ def main():
             # Esc 或 Tab ⇒ 返回主菜单
             if act0["SWITCH_MENU"] or act1["SWITCH_MENU"]:
                 state = 'menu'
+                if current_music != 'menu':
+                    ui.play_bg_music('menu')
+                    current_music = 'menu'
                 continue
 
             # 按 R ⇒ 重新开始本局
@@ -185,11 +214,11 @@ def main():
                 if len(alive) == 1:
                     scores[alive[0].id] += 1
                 ui, screen, clock, space, game_map, hci, tanks, bullets = init_game(debug=True)
-                register_collision_handlers(space, scores)
+                register_collision_handlers(space, scores,ui)
                 state = 'game'
                 continue
 
-            handle_tank_actions(tanks, [act0, act1], bullets, space)
+            handle_tank_actions(tanks, [act0, act1], bullets, space,ui)
             space.step(1 / ui.FPS)
             update_bullets(bullets)
 
@@ -206,7 +235,7 @@ def main():
                         scores[alive[0].id] += 1
                         # 重新初始化游戏并重注册碰撞回调
                         ui, screen, clock, space, game_map, hci, tanks, bullets = init_game(debug=True)
-                        register_collision_handlers(space, scores)
+                        register_collision_handlers(space, scores,ui)
                         state = 'game'
                         countdown_start = None
                         continue

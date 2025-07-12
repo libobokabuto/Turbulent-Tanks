@@ -1,8 +1,11 @@
 import pygame
+import pygame.mixer
 import pymunk
 import config
 import math
+import os
 from map import Game_map
+
 
 class UI:
     """
@@ -54,6 +57,108 @@ class UI:
         self.menu_options    = ["开始游戏", "设置", "退出"]
         self.selected_option = 0
         
+        pygame.mixer.init()
+        self.load_sounds()
+
+    def load_sounds(self):
+        """
+        加载所有音效文件，支持多种格式
+        """
+        self.sounds = {}
+        self.bg_music = {}
+    
+        # 音效文件路径（按优先级排列格式）
+        sound_files = {
+            'tank_fire': ['sounds/tank_fire.wav', 'sounds/tank_fire.ogg'],
+            'bullet_hit_wall': ['sounds/bullet_wall.wav', 'sounds/bullet_wall.ogg'],
+            'tank_explosion': ['sounds/explosion.wav', 'sounds/explosion.ogg'],
+            'menu_select': ['sounds/menu_select.wav', 'sounds/menu_select.ogg'],
+            'menu_confirm': ['sounds/menu_confirm.wav', 'sounds/menu_confirm.ogg'],
+        }
+        
+        # 背景音乐文件
+        music_files = {
+            'menu': ['music/menu_bg.wav', 'music/menu_bg.ogg'],
+            'game': ['music/game_bg.wav', 'music/game_bg.ogg']
+        }
+        
+        # 加载音效
+        for sound_name, file_paths in sound_files.items():
+            loaded = False
+            for file_path in file_paths:
+                try:
+                    if os.path.exists(file_path):
+                        self.sounds[sound_name] = pygame.mixer.Sound(file_path)
+                        print(f"✓ 加载音效: {file_path}")
+                        loaded = True
+                        break
+                except pygame.error as e:
+                    print(f"✗ 无法加载 {file_path}: {e}")
+                    continue
+            
+            if not loaded:
+                print(f"⚠ 未找到音效文件: {sound_name}")
+        
+        # 加载背景音乐
+        for music_name, file_paths in music_files.items():
+            for file_path in file_paths:
+                if os.path.exists(file_path):
+                    self.bg_music[music_name] = file_path
+                    print(f"✓ 找到背景音乐: {file_path}")
+                    break
+            else:
+                print(f"⚠ 未找到背景音乐: {music_name}")
+        
+        print(f"音效加载完成: {len(self.sounds)} 个音效, {len(self.bg_music)} 个背景音乐")
+    def play_sound(self, sound_name):
+        """
+        播放指定名称的音效
+        负责人: liboobkabuto
+        Args:
+            sound_name (str): 音效名称，需要在sounds字典中存在
+        """
+        if sound_name in self.sounds:
+            self.sounds[sound_name].play()
+
+    def play_bg_music(self, music_name, loop=-1):
+        """
+        播放背景音乐
+        负责人: libobokabuto
+        Args:
+            music_name (str): 音乐名称，需要在bg_music字典中存在
+            loop (int): 循环次数，-1表示无限循环，默认为-1
+        """
+        if music_name in self.bg_music:
+            pygame.mixer.music.load(self.bg_music[music_name])
+            pygame.mixer.music.play(loop)
+
+    def stop_bg_music(self):
+        """
+        停止当前播放的背景音乐
+        负责人: libobokabuto
+        """
+        pygame.mixer.music.stop()
+
+    def set_sound_volume(self, volume):
+        """
+        设置音效音量
+        负责人: libobokabuto
+        Args:
+            volume (float): 音量大小，范围0.0-1.0
+        """
+        for sound in self.sounds.values():
+            sound.set_volume(volume)
+
+    def set_music_volume(self, volume):
+        """
+        设置背景音乐音量
+        负责人: libobokabuto
+        Args:
+            volume (float): 音量大小，范围0.0-1.0
+        """
+        pygame.mixer.music.set_volume(volume)
+
+
     def init_pygame(self):
         """
         初始化 Pygame，设置屏幕大小和标题。

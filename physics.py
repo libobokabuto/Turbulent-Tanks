@@ -1,6 +1,9 @@
 import pymunk
 import config
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from ui import UI
 def init_space():
     """
     初始化物理空间，设置重力和碰撞类型。
@@ -13,7 +16,7 @@ def init_space():
     space.damping = config.SPACE_DAMPING    # 关闭全局阻尼
     return space
 
-def register_collision_handlers(space: pymunk.Space, scores: dict):
+def register_collision_handlers(space: pymunk.Space, scores: dict,ui:'UI'):
     """
     子弹打到坦克的碰撞回调（Pymunk ≥7.0），非自杀击杀 +1 分
     负责人: Thousand，libobokabuto
@@ -44,6 +47,7 @@ def register_collision_handlers(space: pymunk.Space, scores: dict):
 
         # 1) 击杀判断 & 加分（非自杀）
         if not tank.dead:
+            ui.play_sound('tank_explosion')
             if bullet.owner_id != tank.id:
                 scores[bullet.owner_id] += 1
 
@@ -56,7 +60,20 @@ def register_collision_handlers(space: pymunk.Space, scores: dict):
 
         # 4) 禁止本次碰撞后续处理
         return False
-
+    def _on_bullet_hit_wall(arbiter, space_, _data):
+        """
+        子弹击中墙壁时的回调函数，播放撞击音效
+        负责人: 音效模块开发者
+        Args:
+            arbiter (pymunk.Arbiter): 碰撞信息
+            space_ (pymunk.Space): 物理空间
+            _data: 用户数据（未使用）
+        Returns:
+            bool: 返回 True，允许正常的物理碰撞处理
+        """
+        ui.play_sound('bullet_hit_wall')
+        return True
+    
         
 
     # 注册——顺序无所谓，只写一次即可
@@ -64,4 +81,10 @@ def register_collision_handlers(space: pymunk.Space, scores: dict):
         config.BULLET_COLLISION_TYPE,   # = 2   :contentReference[oaicite:12]{index=12}
         config.TANK_COLLISION_TYPE,     # = 1   :contentReference[oaicite:13]{index=13}
         begin=_on_bullet_hit_tank,
+    )
+    # 添加新的碰撞注册：
+    space.on_collision(
+        config.BULLET_COLLISION_TYPE,   # = 2
+        0,                              # 静态墙壁的碰撞类型
+        begin=_on_bullet_hit_wall,
     )
